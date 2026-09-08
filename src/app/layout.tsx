@@ -26,16 +26,22 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <nav className="border-b border-black/10 dark:border-white/10">
-          <div className="mx-auto flex w-full max-w-2xl items-center gap-5 px-4 py-3">
-            <span className="text-sm font-semibold">PrepOS</span>
-            <Link href="/" className="text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
+          <div className="mx-auto flex w-full max-w-2xl items-center gap-4 overflow-x-auto whitespace-nowrap px-4 py-3">
+            <span className="shrink-0 text-sm font-semibold">PrepOS</span>
+            <Link href="/" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
               Dashboard
             </Link>
-            <Link href="/problems" className="text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
+            <Link href="/problems" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
               Problems
             </Link>
-            <Link href="/revise" className="text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
+            <Link href="/revise" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
               Revise Today
+            </Link>
+            <Link href="/exams" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
+              Exams
+            </Link>
+            <Link href="/library" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
+              Library
             </Link>
           </div>
         </nav>

@@ -47,6 +47,9 @@ next-env.d.ts
 /dev.db
 /dev.db-journal
 
+# uploaded PDFs — also your data, not source; back this folder up alongside dev.db
+/storage
+
 # Prisma CLI's auto-installed per-editor "AI skill" docs (not app code)
 /.claude/skills
 /.agents

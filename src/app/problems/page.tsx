@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { deleteProblem } from "@/app/actions";
 import { AddProblemForm } from "./AddProblemForm";
+import { LeetCodeImportForm } from "./LeetCodeImportForm";
 import { prisma } from "@/lib/db";
 
 const FILTERS = ["All", "Solved", "Unsolved", "Attempted", "Mistakes", "Easy", "Medium", "Hard"] as const;
@@ -46,6 +47,7 @@ export default async function ProblemsPage({
       <h1 className="text-xl font-semibold">Problems</h1>
 
       <AddProblemForm />
+      <LeetCodeImportForm />
 
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((f) => (

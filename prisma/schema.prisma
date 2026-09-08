@@ -17,6 +17,29 @@ model Problem {
   notes      String?
   createdAt  DateTime  @default(now())
   attempts   Attempt[]
+
+  // SM-2 spaced-repetition state (lives on the card, not the attempt)
+  easeFactor   Float @default(2.5)
+  intervalDays Float @default(0)
+  repetitions  Int   @default(0)
+}
+
+model Exam {
+  id        Int      @id @default(autoincrement())
+  name      String
+  date      DateTime
+  createdAt DateTime @default(now())
+}
+
+model Document {
+  id           Int      @id @default(autoincrement())
+  filename     String // stored filename on disk (uuid-based)
+  originalName String
+  folder       String // subject/topic grouping, free text
+  sizeBytes    Int
+  uploadedAt   DateTime @default(now())
+
+  @@index([folder])
 }
 
 model Attempt {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getDashboardStats, MISTAKE_TAGS } from "@/lib/db";
+import { daysUntil, getDashboardStats, MISTAKE_TAGS } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +8,7 @@ export default async function DashboardPage() {
   const weakestLabel = stats.weakestTag
     ? MISTAKE_TAGS.find((t) => t.value === stats.weakestTag!.tag)?.label ?? stats.weakestTag.tag
     : null;
+  const examDays = stats.soonestExam ? daysUntil(stats.soonestExam.date) : null;
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8">
@@ -42,6 +43,18 @@ export default async function DashboardPage() {
         <Stat label="Revise today" value={stats.revisionDueCount} />
         <Stat label="Streak" value={`${stats.streak}d`} />
       </div>
+
+      {stats.soonestExam && examDays !== null && (
+        <Link
+          href="/exams"
+          className="flex items-center justify-between rounded-lg border border-black/10 p-4 hover:border-black/25 dark:border-white/15 dark:hover:border-white/30"
+        >
+          <span className="text-sm font-medium">{stats.soonestExam.name}</span>
+          <span className={`text-sm font-semibold ${examDays <= 3 ? "text-red-600" : examDays <= 10 ? "text-amber-600" : ""}`}>
+            {examDays === 0 ? "Today" : `${examDays}d`}
+          </span>
+        </Link>
+      )}
 
       <a
         href="/api/export"

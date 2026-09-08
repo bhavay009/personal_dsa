@@ -12,30 +12,36 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
-// Fixed deterministic revision schedule (§10 of the PrepOS spec): 1 / 3 / 7 / 14 / 30 days.
-// A Solved attempt advances one stage; anything else resets to stage 0 (review again tomorrow).
-const REVISION_INTERVALS_DAYS = [1, 3, 7, 14, 30];
-
-export async function getPriorStreak(problemId: number): Promise<number> {
-  const attempts = await prisma.attempt.findMany({
-    where: { problemId },
-    orderBy: { date: "desc" },
-    select: { outcome: true },
-  });
-  let streak = 0;
-  for (const a of attempts) {
-    if (a.outcome === "Solved") streak++;
-    else break;
-  }
-  return streak;
+// SM-2 spaced repetition (V1 upgrade from the fixed 1/3/7/14/30 schedule).
+// Quality is derived from outcome + whether a mistake was tagged, since V0/V1's UI
+// captures those rather than asking the user for a raw 0-5 self-rating.
+export function outcomeToQuality(outcome: Outcome, mistakeTag: string | null): number {
+  if (outcome === "Solved") return mistakeTag ? 4 : 5;
+  if (outcome === "Partial") return 2;
+  return 0; // Failed
 }
 
-export function computeNextRevision(priorStreak: number, outcome: Outcome, from: Date) {
-  const newStreak = outcome === "Solved" ? Math.min(priorStreak + 1, REVISION_INTERVALS_DAYS.length) : 0;
-  const dayOffset = REVISION_INTERVALS_DAYS[Math.max(newStreak - 1, 0)];
+export type Sm2State = { easeFactor: number; intervalDays: number; repetitions: number };
+
+export function computeSm2Update(prev: Sm2State, quality: number, from: Date) {
+  let { easeFactor, intervalDays, repetitions } = prev;
+
+  if (quality < 3) {
+    repetitions = 0;
+    intervalDays = 1;
+  } else {
+    if (repetitions === 0) intervalDays = 1;
+    else if (repetitions === 1) intervalDays = 6;
+    else intervalDays = Math.round(intervalDays * easeFactor);
+    repetitions += 1;
+  }
+
+  easeFactor = Math.max(1.3, easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)));
+
   const nextRevision = new Date(from);
-  nextRevision.setDate(nextRevision.getDate() + dayOffset);
-  return { nextRevision, newStreak };
+  nextRevision.setDate(nextRevision.getDate() + intervalDays);
+
+  return { easeFactor, intervalDays, repetitions, nextRevision };
 }
 
 export async function getRevisionQueue() {
@@ -94,11 +100,36 @@ export async function getDashboardStats() {
     cursor.setDate(cursor.getDate() - 1);
   }
 
+  const soonestExam = await prisma.exam.findFirst({
+    where: { date: { gte: new Date() } },
+    orderBy: { date: "asc" },
+  });
+
   return {
     totalSolved,
     solvedThisWeek,
     revisionDueCount: revisionQueue.length,
     weakestTag,
     streak,
+    soonestExam,
   };
+}
+
+export function daysUntil(date: Date): number {
+  const ms = date.getTime() - Date.now();
+  return Math.ceil(ms / (1000 * 60 * 60 * 24));
+}
+
+export async function getUpcomingExams() {
+  return prisma.exam.findMany({ orderBy: { date: "asc" } });
+}
+
+export async function getDocuments() {
+  const docs = await prisma.document.findMany({ orderBy: [{ folder: "asc" }, { uploadedAt: "desc" }] });
+  const byFolder = new Map<string, typeof docs>();
+  for (const d of docs) {
+    if (!byFolder.has(d.folder)) byFolder.set(d.folder, []);
+    byFolder.get(d.folder)!.push(d);
+  }
+  return byFolder;
 }
