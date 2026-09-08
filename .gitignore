@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+
+# local SQLite database — this is your actual DSA data, back it up manually
+# (see Part 9 of the product plan: `cp dev.db` to a synced folder after sessions)
+/dev.db
+/dev.db-journal
+
+# Prisma CLI's auto-installed per-editor "AI skill" docs (not app code)
+/.claude/skills
+/.agents
+/.windsurf
+/skills-lock.json

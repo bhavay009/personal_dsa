@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Problem {
+  id         Int       @id @default(autoincrement())
+  title      String
+  url        String?
+  pattern    String
+  difficulty String // Easy | Medium | Hard
+  status     String    @default("Unsolved") // Solved | Unsolved | Attempted
+  notes      String?
+  createdAt  DateTime  @default(now())
+  attempts   Attempt[]
+}
+
+model Attempt {
+  id           Int       @id @default(autoincrement())
+  problem      Problem   @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  problemId    Int
+  date         DateTime  @default(now())
+  outcome      String // Solved | Failed | Partial
+  mistakeTag   String? // concept | pattern-recognition | logic | coding | edge-case |
+  // time-complexity | space-complexity | misread | needed-hint | needed-solution |
+  // forgot-concept | time-management
+  timeTakenMin Int?
+  nextRevision DateTime?
+
+  @@index([problemId])
+  @@index([nextRevision])
+}
