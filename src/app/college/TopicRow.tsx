@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { deleteTopic, updateTopicConfidence } from "@/app/actions";
+import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 
 export function TopicRow({
   id,
@@ -42,11 +43,13 @@ export function TopicRow({
       <span className={`w-14 shrink-0 text-right text-xs ${decayed ? "text-amber-600" : "text-black/50 dark:text-white/50"}`}>
         {decayed ? `${effectiveConfidence}%*` : `${value}%`}
       </span>
-      <form action={deleteTopic.bind(null, id)}>
-        <button className="shrink-0 text-xs text-black/30 hover:text-red-600 dark:text-white/30 dark:hover:text-red-400">
-          ×
-        </button>
-      </form>
+      <ConfirmDeleteButton
+        action={deleteTopic.bind(null, id)}
+        confirmMessage={`Delete topic "${name}"? This can't be undone.`}
+        className="shrink-0 text-xs text-black/30 hover:text-red-600 dark:text-white/30 dark:hover:text-red-400"
+      >
+        ×
+      </ConfirmDeleteButton>
     </div>
   );
 }

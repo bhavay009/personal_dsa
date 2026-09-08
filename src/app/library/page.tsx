@@ -1,5 +1,6 @@
 import { deleteDocument } from "@/app/actions";
 import { getDocuments } from "@/lib/db";
+import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { UploadForm } from "./UploadForm";
 import { SearchNotes } from "./SearchNotes";
 
@@ -38,11 +39,11 @@ export default async function LibraryPage() {
                 </a>
                 <div className="flex shrink-0 items-center gap-3">
                   <span className="text-xs text-black/40 dark:text-white/40">{formatSize(d.sizeBytes)}</span>
-                  <form action={deleteDocument.bind(null, d.id)}>
-                    <button className="text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400">
-                      Delete
-                    </button>
-                  </form>
+                  <ConfirmDeleteButton
+                    action={deleteDocument.bind(null, d.id)}
+                    confirmMessage={`Delete "${d.originalName}"? This can't be undone.`}
+                    className="text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400"
+                  />
                 </div>
               </div>
             ))}

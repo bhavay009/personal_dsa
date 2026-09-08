@@ -1,7 +1,6 @@
-import { deleteApplication } from "@/app/actions";
 import { getApplications } from "@/lib/db";
 import { ApplicationForm } from "./ApplicationForm";
-import { StageSelect } from "./StageSelect";
+import { ApplicationRow } from "./ApplicationRow";
 
 export const dynamic = "force-dynamic";
 
@@ -18,31 +17,7 @@ export default async function ApplicationsPage() {
           <p className="py-6 text-sm text-black/50 dark:text-white/50">No applications tracked yet.</p>
         )}
         {applications.map((a) => (
-          <div key={a.id} className="flex items-center justify-between gap-3 py-3">
-            <div className="min-w-0">
-              <div className="font-medium">
-                {a.url ? (
-                  <a href={a.url} target="_blank" rel="noreferrer" className="hover:underline">
-                    {a.company}
-                  </a>
-                ) : (
-                  a.company
-                )}
-              </div>
-              <div className="text-xs text-black/50 dark:text-white/50">
-                {a.role}
-                {a.referral && " · referral"}
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <StageSelect id={a.id} stage={a.stage} />
-              <form action={deleteApplication.bind(null, a.id)}>
-                <button className="text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400">
-                  Delete
-                </button>
-              </form>
-            </div>
-          </div>
+          <ApplicationRow key={a.id} id={a.id} company={a.company} role={a.role} url={a.url} stage={a.stage} referral={a.referral} />
         ))}
       </div>
     </div>

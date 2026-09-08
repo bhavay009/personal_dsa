@@ -1,5 +1,6 @@
 import { deleteInterviewQuestion } from "@/app/actions";
 import { getInterviewQuestions, getInterviewSessions, getInterviewStatsByCategory } from "@/lib/db";
+import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { QuestionForm } from "./QuestionForm";
 import { SessionForm } from "./SessionForm";
 
@@ -58,11 +59,11 @@ export default async function InterviewPage() {
                   <span className="min-w-0">
                     {q.question} <span className="text-xs text-black/40 dark:text-white/40">({q.difficulty})</span>
                   </span>
-                  <form action={deleteInterviewQuestion.bind(null, q.id)}>
-                    <button className="shrink-0 text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400">
-                      Delete
-                    </button>
-                  </form>
+                  <ConfirmDeleteButton
+                    action={deleteInterviewQuestion.bind(null, q.id)}
+                    confirmMessage="Delete this question? This can't be undone."
+                    className="shrink-0 text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400"
+                  />
                 </div>
               ))}
             </div>

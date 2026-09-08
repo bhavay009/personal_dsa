@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { addProjectQuestion, deleteInterviewQuestion } from "@/app/actions";
+import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 
 const DEFAULT_PROMPTS: Record<string, string[]> = {
   Easy: ["What does this project do, in one sentence?", "Who is it for, and what problem does it solve?"],
@@ -46,11 +47,13 @@ export function ProjectInterviewer({
               {custom.map((q) => (
                 <li key={q.id} className="flex items-center justify-between gap-2">
                   <span>{q.question}</span>
-                  <form action={deleteInterviewQuestion.bind(null, q.id)}>
-                    <button className="shrink-0 text-xs text-black/30 hover:text-red-600 dark:text-white/30 dark:hover:text-red-400">
-                      ×
-                    </button>
-                  </form>
+                  <ConfirmDeleteButton
+                    action={deleteInterviewQuestion.bind(null, q.id)}
+                    confirmMessage="Delete this question? This can't be undone."
+                    className="shrink-0 text-xs text-black/30 hover:text-red-600 dark:text-white/30 dark:hover:text-red-400"
+                  >
+                    ×
+                  </ConfirmDeleteButton>
                 </li>
               ))}
             </ul>

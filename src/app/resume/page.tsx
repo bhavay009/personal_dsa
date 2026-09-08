@@ -1,5 +1,6 @@
 import { deleteDocument } from "@/app/actions";
 import { analyzeResumeText, getResumeVersions } from "@/lib/db";
+import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { UploadResumeForm } from "./UploadResumeForm";
 import { JdCompareForm } from "./JdCompareForm";
 
@@ -57,11 +58,11 @@ export default async function ResumePage() {
                 </a>
                 <div className="flex shrink-0 items-center gap-3">
                   <span className="text-xs text-black/40 dark:text-white/40">{d.uploadedAt.toLocaleDateString()}</span>
-                  <form action={deleteDocument.bind(null, d.id)}>
-                    <button className="text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400">
-                      Delete
-                    </button>
-                  </form>
+                  <ConfirmDeleteButton
+                    action={deleteDocument.bind(null, d.id)}
+                    confirmMessage={`Delete "${d.originalName}"? This can't be undone.`}
+                    className="text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400"
+                  />
                 </div>
               </div>
             ))}

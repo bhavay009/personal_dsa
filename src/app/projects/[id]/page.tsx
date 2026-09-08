@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { deleteProject } from "@/app/actions";
 import { getProjectDetail } from "@/lib/db";
+import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { ProjectDetailForm } from "../ProjectDetailForm";
 import { ProjectInterviewer } from "../ProjectInterviewer";
 
@@ -23,11 +24,13 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           {project.description && <p className="text-sm text-black/60 dark:text-white/60">{project.description}</p>}
           {project.techStack && <p className="text-xs text-black/40 dark:text-white/40">{project.techStack}</p>}
         </div>
-        <form action={deleteProject.bind(null, project.id)}>
-          <button className="shrink-0 text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400">
-            Delete project
-          </button>
-        </form>
+        <ConfirmDeleteButton
+          action={deleteProject.bind(null, project.id)}
+          confirmMessage={`Delete "${project.name}"? This also deletes its interview questions. This can't be undone.`}
+          className="shrink-0 text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400"
+        >
+          Delete project
+        </ConfirmDeleteButton>
       </div>
 
       <ProjectDetailForm

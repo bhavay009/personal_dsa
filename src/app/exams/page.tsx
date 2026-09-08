@@ -1,5 +1,6 @@
 import { deleteExam } from "@/app/actions";
 import { daysUntil, getUpcomingExams } from "@/lib/db";
+import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { ExamForm } from "./ExamForm";
 
 export const dynamic = "force-dynamic";
@@ -32,11 +33,11 @@ export default async function ExamsPage() {
                 >
                   {days < 0 ? "Past" : days === 0 ? "Today" : `${days}d`}
                 </span>
-                <form action={deleteExam.bind(null, e.id)}>
-                  <button className="text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400">
-                    Delete
-                  </button>
-                </form>
+                <ConfirmDeleteButton
+                  action={deleteExam.bind(null, e.id)}
+                  confirmMessage={`Delete "${e.name}"? This can't be undone.`}
+                  className="text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400"
+                />
               </div>
             </div>
           );

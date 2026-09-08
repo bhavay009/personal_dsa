@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { deleteProblem } from "@/app/actions";
+import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { AddProblemForm } from "./AddProblemForm";
 import { LeetCodeImportForm } from "./LeetCodeImportForm";
 import { prisma } from "@/lib/db";
@@ -96,11 +97,11 @@ export default async function ProblemsPage({
                   )}
                 </div>
               </div>
-              <form action={deleteProblem.bind(null, p.id)}>
-                <button className="shrink-0 text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400">
-                  Delete
-                </button>
-              </form>
+              <ConfirmDeleteButton
+                action={deleteProblem.bind(null, p.id)}
+                confirmMessage={`Delete "${p.title}"? This also deletes its attempt history. This can't be undone.`}
+                className="shrink-0 text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400"
+              />
             </div>
           );
         })}

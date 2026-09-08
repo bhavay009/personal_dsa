@@ -345,6 +345,12 @@ export async function createSubject(input: { name: string; semester: string | nu
   revalidatePath("/college");
 }
 
+export async function updateSubject(id: number, input: { name: string; semester: string | null }) {
+  await prisma.subject.update({ where: { id }, data: { name: input.name, semester: input.semester } });
+  revalidatePath("/college");
+  revalidatePath(`/college/${id}`);
+}
+
 export async function deleteSubject(id: number) {
   await prisma.subject.delete({ where: { id } });
   revalidatePath("/college");
@@ -405,6 +411,11 @@ export async function createSkill(input: { name: string; category: string }) {
     create: { name: input.name, category: input.category },
     update: {},
   });
+  revalidatePath("/skills");
+}
+
+export async function updateSkill(id: number, input: { name: string; category: string }) {
+  await prisma.skill.update({ where: { id }, data: { name: input.name, category: input.category } });
   revalidatePath("/skills");
 }
 
@@ -489,6 +500,11 @@ export async function createApplication(input: { company: string; role: string; 
   await prisma.application.create({ data: { company: input.company, role: input.role, url: input.url } });
   revalidatePath("/applications");
   revalidatePath("/insights");
+}
+
+export async function updateApplication(id: number, input: { company: string; role: string; url: string | null }) {
+  await prisma.application.update({ where: { id }, data: { company: input.company, role: input.role, url: input.url } });
+  revalidatePath("/applications");
 }
 
 export async function updateApplicationStage(id: number, stage: string) {

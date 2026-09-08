@@ -1,7 +1,6 @@
-import Link from "next/link";
-import { deleteSubject } from "@/app/actions";
 import { daysUntil, getSubjects, getUpcomingAssignments, topicDecay } from "@/lib/db";
 import { SubjectForm } from "./SubjectForm";
+import { SubjectRow } from "./SubjectRow";
 
 export const dynamic = "force-dynamic";
 
@@ -39,23 +38,15 @@ export default async function CollegePage() {
         {subjects.map((s) => {
           const decayedCount = s.topics.filter((t) => topicDecay(t).decayed).length;
           return (
-            <div key={s.id} className="flex items-center justify-between gap-3 py-3">
-              <Link href={`/college/${s.id}`} className="min-w-0">
-                <div className="font-medium hover:underline">
-                  {s.name} {s.semester && <span className="text-xs text-black/40 dark:text-white/40">({s.semester})</span>}
-                </div>
-                <div className="text-xs text-black/50 dark:text-white/50">
-                  {s.topics.length} topic{s.topics.length === 1 ? "" : "s"}
-                  {s.assignments.length > 0 && ` · ${s.assignments.length} pending assignment${s.assignments.length === 1 ? "" : "s"}`}
-                  {decayedCount > 0 && <span className="text-amber-600"> · {decayedCount} decaying</span>}
-                </div>
-              </Link>
-              <form action={deleteSubject.bind(null, s.id)}>
-                <button className="shrink-0 text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400">
-                  Delete
-                </button>
-              </form>
-            </div>
+            <SubjectRow
+              key={s.id}
+              id={s.id}
+              name={s.name}
+              semester={s.semester}
+              topicCount={s.topics.length}
+              pendingAssignmentCount={s.assignments.length}
+              decayedCount={decayedCount}
+            />
           );
         })}
       </div>

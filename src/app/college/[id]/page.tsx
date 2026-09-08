@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { deleteAssignment } from "@/app/actions";
 import { daysUntil, getSubjectDetail, topicDecay } from "@/lib/db";
+import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { AddAssignmentForm } from "../AddAssignmentForm";
 import { AddTopicForm } from "../AddTopicForm";
 import { AssignmentToggle } from "../AssignmentToggle";
@@ -71,11 +72,11 @@ export default async function SubjectDetailPage({ params }: { params: Promise<{ 
                       {days < 0 ? "Overdue" : `${days}d`}
                     </span>
                   )}
-                  <form action={deleteAssignment.bind(null, a.id)}>
-                    <button className="text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400">
-                      Delete
-                    </button>
-                  </form>
+                  <ConfirmDeleteButton
+                    action={deleteAssignment.bind(null, a.id)}
+                    confirmMessage={`Delete assignment "${a.title}"? This can't be undone.`}
+                    className="text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400"
+                  />
                 </div>
               </div>
             );

@@ -28,6 +28,7 @@ export default async function SkillsPage() {
                 key={s.id}
                 id={s.id}
                 name={s.name}
+                category={s.category}
                 stages={{
                   learned: s.learned,
                   practiced: s.practiced,
