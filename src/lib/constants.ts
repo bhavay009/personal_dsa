@@ -31,6 +31,26 @@ export const DIFFICULTIES = ["Easy", "Medium", "Hard"] as const;
 export const OUTCOMES = ["Solved", "Failed", "Partial"] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 
+export const SKILL_CATEGORIES = ["Frontend", "Backend", "Database", "DevOps", "Tools", "Other"] as const;
+
+export const INTERVIEW_CATEGORIES = [
+  "DSA",
+  "JS",
+  "React",
+  "Node",
+  "SQL",
+  "DBMS",
+  "OS",
+  "CN",
+  "OOP",
+  "SystemDesign",
+  "Behavioral",
+] as const;
+
+export const QUESTION_DIFFICULTIES = ["Easy", "Medium", "Hard", "Advanced"] as const;
+
+export const APPLICATION_STAGES = ["Saved", "Applied", "OA", "Technical", "HR", "Offer", "Rejected"] as const;
+
 export const MISTAKE_TAGS = [
   { value: "concept", label: "Concept" },
   { value: "pattern-recognition", label: "Pattern recognition" },

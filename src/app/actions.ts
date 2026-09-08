@@ -5,12 +5,15 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import {
+  compareJobDescription,
   computeSm2Update,
   outcomeToQuality,
   prisma,
+  searchDocuments,
   type Outcome,
   PATTERNS,
 } from "@/lib/db";
+import { getSmartPlan } from "@/lib/insights";
 
 export type AttemptInput = {
   outcome: Outcome | null;
@@ -130,7 +133,19 @@ export async function deleteExam(id: number) {
 
 const STORAGE_DIR = path.join(process.cwd(), "storage", "pdfs");
 
-export async function uploadDocument(formData: FormData) {
+async function extractPdfText(bytes: Buffer): Promise<string | null> {
+  try {
+    const { PDFParse } = await import("pdf-parse");
+    const parser = new PDFParse({ data: bytes });
+    const result = await parser.getText();
+    await parser.destroy();
+    return result.text.slice(0, 200_000); // cap — this is a search index, not an archive
+  } catch {
+    return null; // scanned/image-only PDFs, or a parse failure — search just won't find this one
+  }
+}
+
+export async function uploadDocument(formData: FormData, docType: "Notes" | "PYQ" | "Resume" = "Notes") {
   const file = formData.get("file");
   const folder = String(formData.get("folder") || "General").trim() || "General";
   if (!(file instanceof File) || file.size === 0) return;
@@ -141,22 +156,38 @@ export async function uploadDocument(formData: FormData) {
   const bytes = Buffer.from(await file.arrayBuffer());
   await writeFile(path.join(STORAGE_DIR, storedName), bytes);
 
+  const extractedText = await extractPdfText(bytes);
+
   await prisma.document.create({
     data: {
       filename: storedName,
       originalName: file.name,
       folder,
       sizeBytes: file.size,
+      docType,
+      extractedText,
     },
   });
 
   revalidatePath("/library");
+  revalidatePath("/resume");
+  revalidatePath("/");
+}
+
+export async function uploadResume(formData: FormData) {
+  await uploadDocument(formData, "Resume");
+}
+
+export async function uploadPyq(formData: FormData) {
+  await uploadDocument(formData, "PYQ");
 }
 
 export async function deleteDocument(id: number) {
   const doc = await prisma.document.delete({ where: { id } });
   await unlink(path.join(STORAGE_DIR, doc.filename)).catch(() => {});
   revalidatePath("/library");
+  revalidatePath("/resume");
+  revalidatePath("/");
 }
 
 // ---------- LeetCode import ----------
@@ -305,4 +336,190 @@ export async function importFromLeetCode(username: string): Promise<LeetCodeImpo
       error: `Couldn't reach LeetCode (${err instanceof Error ? err.message : "unknown error"}). Their unofficial API can change or block requests without notice — add the problem manually if this keeps failing.`,
     };
   }
+}
+
+// ---------- College: Subjects / Topics / Assignments ----------
+
+export async function createSubject(input: { name: string; semester: string | null }) {
+  await prisma.subject.create({ data: { name: input.name, semester: input.semester } });
+  revalidatePath("/college");
+}
+
+export async function deleteSubject(id: number) {
+  await prisma.subject.delete({ where: { id } });
+  revalidatePath("/college");
+}
+
+export async function createTopic(subjectId: number, name: string) {
+  await prisma.topic.create({ data: { subjectId, name } });
+  revalidatePath("/college");
+}
+
+export async function updateTopicConfidence(id: number, confidence: number) {
+  await prisma.topic.update({ where: { id }, data: { confidence, lastRevised: new Date() } });
+  revalidatePath("/college");
+  revalidatePath("/");
+}
+
+export async function deleteTopic(id: number) {
+  await prisma.topic.delete({ where: { id } });
+  revalidatePath("/college");
+}
+
+export async function createAssignment(input: {
+  subjectId: number;
+  title: string;
+  deadline: string;
+  priority: string;
+  estimateMin: number | null;
+}) {
+  await prisma.assignment.create({
+    data: {
+      subjectId: input.subjectId,
+      title: input.title,
+      deadline: new Date(input.deadline),
+      priority: input.priority,
+      estimateMin: input.estimateMin,
+    },
+  });
+  revalidatePath("/college");
+  revalidatePath("/");
+}
+
+export async function toggleAssignment(id: number, done: boolean) {
+  await prisma.assignment.update({ where: { id }, data: { status: done ? "Done" : "Pending" } });
+  revalidatePath("/college");
+  revalidatePath("/");
+}
+
+export async function deleteAssignment(id: number) {
+  await prisma.assignment.delete({ where: { id } });
+  revalidatePath("/college");
+}
+
+// ---------- Skills ----------
+
+export async function createSkill(input: { name: string; category: string }) {
+  await prisma.skill.upsert({
+    where: { name: input.name },
+    create: { name: input.name, category: input.category },
+    update: {},
+  });
+  revalidatePath("/skills");
+}
+
+export async function updateSkillStage(id: number, stage: "learned" | "practiced" | "built" | "explained" | "interviewReady", value: boolean) {
+  await prisma.skill.update({ where: { id }, data: { [stage]: value } });
+  revalidatePath("/skills");
+  revalidatePath("/insights");
+}
+
+export async function deleteSkill(id: number) {
+  await prisma.skill.delete({ where: { id } });
+  revalidatePath("/skills");
+}
+
+// ---------- Projects ----------
+
+export async function createProject(input: { name: string; description: string | null; techStack: string | null }) {
+  const project = await prisma.project.create({
+    data: { name: input.name, description: input.description, techStack: input.techStack },
+  });
+  revalidatePath("/projects");
+  return project.id;
+}
+
+export async function updateProject(
+  id: number,
+  input: { architecture: string; challenges: string; decisions: string; githubUrl: string; liveUrl: string },
+) {
+  await prisma.project.update({
+    where: { id },
+    data: {
+      architecture: input.architecture || null,
+      challenges: input.challenges || null,
+      decisions: input.decisions || null,
+      githubUrl: input.githubUrl || null,
+      liveUrl: input.liveUrl || null,
+    },
+  });
+  revalidatePath(`/projects/${id}`);
+  revalidatePath("/insights");
+}
+
+export async function deleteProject(id: number) {
+  await prisma.project.delete({ where: { id } });
+  revalidatePath("/projects");
+}
+
+export async function addProjectQuestion(projectId: number, input: { difficulty: string; question: string }) {
+  await prisma.interviewQuestion.create({
+    data: { category: "Project", projectId, difficulty: input.difficulty, question: input.question },
+  });
+  revalidatePath(`/projects/${projectId}`);
+}
+
+// ---------- Interview prep ----------
+
+export async function createInterviewQuestion(input: { category: string; difficulty: string; question: string }) {
+  await prisma.interviewQuestion.create({ data: input });
+  revalidatePath("/interview");
+}
+
+export async function deleteInterviewQuestion(id: number) {
+  await prisma.interviewQuestion.delete({ where: { id } });
+  revalidatePath("/interview");
+}
+
+export async function logInterviewSession(input: {
+  mode: string;
+  projectId: number | null;
+  totalQ: number;
+  correctQ: number;
+  notes: string | null;
+}) {
+  await prisma.interviewSession.create({ data: input });
+  revalidatePath("/interview");
+  revalidatePath("/insights");
+}
+
+// ---------- Applications ----------
+
+export async function createApplication(input: { company: string; role: string; url: string | null }) {
+  await prisma.application.create({ data: { company: input.company, role: input.role, url: input.url } });
+  revalidatePath("/applications");
+  revalidatePath("/insights");
+}
+
+export async function updateApplicationStage(id: number, stage: string) {
+  await prisma.application.update({
+    where: { id },
+    data: { stage, appliedDate: stage === "Applied" ? new Date() : undefined },
+  });
+  revalidatePath("/applications");
+  revalidatePath("/insights");
+}
+
+export async function deleteApplication(id: number) {
+  await prisma.application.delete({ where: { id } });
+  revalidatePath("/applications");
+}
+
+// ---------- Resume: JD comparison ----------
+
+export async function compareResumeToJD(jdText: string) {
+  const skills = await prisma.skill.findMany({ select: { name: true } });
+  return compareJobDescription(jdText, skills.map((s) => s.name), [...PATTERNS]);
+}
+
+// ---------- Library: Ask My Notes ----------
+
+export async function searchNotes(query: string) {
+  return searchDocuments(query);
+}
+
+// ---------- Insights: smart planner ----------
+
+export async function fetchSmartPlan(hoursAvailable: number, goal: string) {
+  return getSmartPlan(hoursAvailable, goal);
 }

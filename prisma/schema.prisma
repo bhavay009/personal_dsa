@@ -32,14 +32,120 @@ model Exam {
 }
 
 model Document {
-  id           Int      @id @default(autoincrement())
-  filename     String // stored filename on disk (uuid-based)
-  originalName String
-  folder       String // subject/topic grouping, free text
-  sizeBytes    Int
-  uploadedAt   DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  filename      String // stored filename on disk (uuid-based)
+  originalName  String
+  folder        String // subject/topic grouping, free text
+  sizeBytes     Int
+  uploadedAt    DateTime @default(now())
+  docType       String   @default("Notes") // Notes | PYQ | Resume
+  extractedText String? // plain text pulled from the PDF, powers Ask My Notes (FTS5) + resume analysis
 
   @@index([folder])
+  @@index([docType])
+}
+
+model Subject {
+  id          Int          @id @default(autoincrement())
+  name        String
+  semester    String?
+  createdAt   DateTime     @default(now())
+  topics      Topic[]
+  assignments Assignment[]
+}
+
+model Topic {
+  id          Int       @id @default(autoincrement())
+  subject     Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId   Int
+  name        String
+  confidence  Int       @default(0) // 0-100, self-rated
+  lastRevised DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([subjectId])
+}
+
+model Assignment {
+  id          Int       @id @default(autoincrement())
+  subject     Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId   Int
+  title       String
+  deadline    DateTime
+  priority    String    @default("Medium") // Low | Medium | High
+  status      String    @default("Pending") // Pending | Done
+  estimateMin Int?
+  createdAt   DateTime  @default(now())
+
+  @@index([subjectId])
+}
+
+model Skill {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique
+  category       String // Frontend | Backend | Database | DevOps | Tools | Other
+  learned        Boolean  @default(false)
+  practiced      Boolean  @default(false)
+  built          Boolean  @default(false)
+  explained      Boolean  @default(false)
+  interviewReady Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+model Project {
+  id           Int                 @id @default(autoincrement())
+  name         String
+  description  String?
+  techStack    String?
+  architecture String?
+  challenges   String?
+  decisions    String?
+  githubUrl    String?
+  liveUrl      String?
+  createdAt    DateTime            @default(now())
+  questions    InterviewQuestion[]
+  sessions     InterviewSession[]
+}
+
+model InterviewQuestion {
+  id         Int      @id @default(autoincrement())
+  category   String // DSA | JS | React | Node | SQL | DBMS | OS | CN | OOP | SystemDesign | Behavioral | Project
+  difficulty String   @default("Medium") // Easy | Medium | Hard | Advanced
+  question   String
+  projectId  Int?
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([category])
+  @@index([projectId])
+}
+
+model InterviewSession {
+  id        Int      @id @default(autoincrement())
+  mode      String // DSA | JS | React | Node | SQL | DBMS | OS | CN | OOP | SystemDesign | Behavioral | Project | Mixed
+  projectId Int?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  date      DateTime @default(now())
+  totalQ    Int
+  correctQ  Int
+  notes     String?
+
+  @@index([mode])
+}
+
+model Application {
+  id            Int       @id @default(autoincrement())
+  company       String
+  role          String
+  url           String?
+  stage         String    @default("Saved") // Saved | Applied | OA | Technical | HR | Offer | Rejected
+  appliedDate   DateTime?
+  interviewDate DateTime?
+  referral      Boolean   @default(false)
+  notes         String?
+  createdAt     DateTime  @default(now())
+
+  @@index([stage])
 }
 
 model Attempt {

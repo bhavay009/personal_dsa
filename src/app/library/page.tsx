@@ -1,6 +1,7 @@
 import { deleteDocument } from "@/app/actions";
 import { getDocuments } from "@/lib/db";
 import { UploadForm } from "./UploadForm";
+import { SearchNotes } from "./SearchNotes";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export default async function LibraryPage() {
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8">
       <h1 className="text-xl font-semibold">Library</h1>
       <UploadForm />
+      <SearchNotes />
 
       {byFolder.size === 0 && <p className="text-sm text-black/50 dark:text-white/50">No PDFs uploaded yet.</p>}
 

@@ -43,6 +43,27 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/library" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
               Library
             </Link>
+            <Link href="/college" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
+              College
+            </Link>
+            <Link href="/skills" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
+              Skills
+            </Link>
+            <Link href="/projects" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
+              Projects
+            </Link>
+            <Link href="/interview" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
+              Interview
+            </Link>
+            <Link href="/resume" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
+              Resume
+            </Link>
+            <Link href="/applications" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
+              Applications
+            </Link>
+            <Link href="/insights" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
+              Insights
+            </Link>
           </div>
         </nav>
         <main className="flex flex-1 flex-col">{children}</main>
