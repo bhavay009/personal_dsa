@@ -1,14 +1,22 @@
 import Link from "next/link";
-import { daysUntil, getDashboardStats, MISTAKE_TAGS } from "@/lib/db";
+import { daysUntil, getDashboardStats, getUpcomingAssignments, MISTAKE_TAGS } from "@/lib/db";
+import { getCareerReadiness, getWhatAmIMissing } from "@/lib/insights";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const stats = await getDashboardStats();
+  const [stats, readiness, gaps, assignments] = await Promise.all([
+    getDashboardStats(),
+    getCareerReadiness(),
+    getWhatAmIMissing(),
+    getUpcomingAssignments(),
+  ]);
   const weakestLabel = stats.weakestTag
     ? MISTAKE_TAGS.find((t) => t.value === stats.weakestTag!.tag)?.label ?? stats.weakestTag.tag
     : null;
   const examDays = stats.soonestExam ? daysUntil(stats.soonestExam.date) : null;
+  const nearestAssignment = assignments[0] ?? null;
+  const assignmentDays = nearestAssignment ? daysUntil(nearestAssignment.deadline) : null;
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8">
@@ -44,6 +52,14 @@ export default async function DashboardPage() {
         <Stat label="Streak" value={`${stats.streak}d`} />
       </div>
 
+      <Link
+        href="/insights"
+        className="flex items-center justify-between rounded-lg border border-black/10 p-4 hover:border-black/25 dark:border-white/15 dark:hover:border-white/30"
+      >
+        <span className="text-sm font-medium">Career readiness</span>
+        <span className="text-sm font-semibold">{readiness.overall}%</span>
+      </Link>
+
       {stats.soonestExam && examDays !== null && (
         <Link
           href="/exams"
@@ -53,6 +69,29 @@ export default async function DashboardPage() {
           <span className={`text-sm font-semibold ${examDays <= 3 ? "text-red-600" : examDays <= 10 ? "text-amber-600" : ""}`}>
             {examDays === 0 ? "Today" : `${examDays}d`}
           </span>
+        </Link>
+      )}
+
+      {nearestAssignment && assignmentDays !== null && (
+        <Link
+          href="/college"
+          className="flex items-center justify-between rounded-lg border border-black/10 p-4 hover:border-black/25 dark:border-white/15 dark:hover:border-white/30"
+        >
+          <span className="text-sm font-medium">
+            {nearestAssignment.title} <span className="text-black/40 dark:text-white/40">— {nearestAssignment.subject.name}</span>
+          </span>
+          <span className={`text-sm font-semibold ${assignmentDays <= 2 ? "text-red-600" : assignmentDays <= 7 ? "text-amber-600" : ""}`}>
+            {assignmentDays < 0 ? "Overdue" : assignmentDays === 0 ? "Today" : `${assignmentDays}d`}
+          </span>
+        </Link>
+      )}
+
+      {gaps.length > 0 && (
+        <Link
+          href="/insights"
+          className="self-start text-xs text-black/40 hover:text-black/70 hover:underline dark:text-white/40 dark:hover:text-white/70"
+        >
+          Biggest gap: {gaps[0]}
         </Link>
       )}
 
