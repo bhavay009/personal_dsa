@@ -42,6 +42,14 @@ export default async function DashboardPage() {
         <Stat label="Revise today" value={stats.revisionDueCount} />
         <Stat label="Streak" value={`${stats.streak}d`} />
       </div>
+
+      <a
+        href="/api/export"
+        download
+        className="self-start text-xs text-black/40 hover:text-black/70 hover:underline dark:text-white/40 dark:hover:text-white/70"
+      >
+        Export data (JSON backup)
+      </a>
     </div>
   );
 }
