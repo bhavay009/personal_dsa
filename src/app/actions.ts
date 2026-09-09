@@ -69,6 +69,19 @@ export async function createProblem(input: {
   revalidatePath("/revise");
 }
 
+export async function updateProblem(
+  id: number,
+  input: { title: string; url: string | null; pattern: string; difficulty: string },
+) {
+  await prisma.problem.update({
+    where: { id },
+    data: { title: input.title, url: input.url, pattern: input.pattern, difficulty: input.difficulty },
+  });
+  revalidatePath("/");
+  revalidatePath("/problems");
+  revalidatePath("/revise");
+}
+
 export async function logAttempt(problemId: number, input: AttemptInput) {
   if (!input.outcome) return;
   const now = new Date();
@@ -119,6 +132,12 @@ export async function deleteProblem(id: number) {
 
 export async function createExam(input: { name: string; date: string }) {
   await prisma.exam.create({ data: { name: input.name, date: new Date(input.date) } });
+  revalidatePath("/");
+  revalidatePath("/exams");
+}
+
+export async function updateExam(id: number, input: { name: string; date: string }) {
+  await prisma.exam.update({ where: { id }, data: { name: input.name, date: new Date(input.date) } });
   revalidatePath("/");
   revalidatePath("/exams");
 }
@@ -361,6 +380,11 @@ export async function createTopic(subjectId: number, name: string) {
   revalidatePath("/college");
 }
 
+export async function updateTopicName(id: number, name: string) {
+  await prisma.topic.update({ where: { id }, data: { name } });
+  revalidatePath("/college");
+}
+
 export async function updateTopicConfidence(id: number, confidence: number) {
   await prisma.topic.update({ where: { id }, data: { confidence, lastRevised: new Date() } });
   revalidatePath("/college");
@@ -387,6 +411,18 @@ export async function createAssignment(input: {
       priority: input.priority,
       estimateMin: input.estimateMin,
     },
+  });
+  revalidatePath("/college");
+  revalidatePath("/");
+}
+
+export async function updateAssignment(
+  id: number,
+  input: { title: string; deadline: string; priority: string; estimateMin: number | null },
+) {
+  await prisma.assignment.update({
+    where: { id },
+    data: { title: input.title, deadline: new Date(input.deadline), priority: input.priority, estimateMin: input.estimateMin },
   });
   revalidatePath("/college");
   revalidatePath("/");
@@ -438,6 +474,18 @@ export async function createProject(input: { name: string; description: string |
   });
   revalidatePath("/projects");
   return project.id;
+}
+
+export async function updateProjectMeta(
+  id: number,
+  input: { name: string; description: string | null; techStack: string | null },
+) {
+  await prisma.project.update({
+    where: { id },
+    data: { name: input.name, description: input.description, techStack: input.techStack },
+  });
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${id}`);
 }
 
 export async function updateProject(

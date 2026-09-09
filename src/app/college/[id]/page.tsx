@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteAssignment } from "@/app/actions";
 import { daysUntil, getSubjectDetail, topicDecay } from "@/lib/db";
-import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { AddAssignmentForm } from "../AddAssignmentForm";
 import { AddTopicForm } from "../AddTopicForm";
-import { AssignmentToggle } from "../AssignmentToggle";
+import { AssignmentRow } from "../AssignmentRow";
 import { TopicRow } from "../TopicRow";
 
 export const dynamic = "force-dynamic";
@@ -57,30 +55,18 @@ export default async function SubjectDetailPage({ params }: { params: Promise<{ 
           {subject.assignments.length === 0 && (
             <p className="py-3 text-sm text-black/50 dark:text-white/50">No assignments yet.</p>
           )}
-          {subject.assignments.map((a) => {
-            const days = daysUntil(a.deadline);
-            return (
-              <div key={a.id} className="flex items-center justify-between gap-3 py-2">
-                <label className="flex min-w-0 items-center gap-2 text-sm">
-                  <AssignmentToggle id={a.id} done={a.status === "Done"} />
-                  <span className={a.status === "Done" ? "text-black/40 line-through dark:text-white/40" : ""}>{a.title}</span>
-                  <span className="shrink-0 text-xs text-black/40 dark:text-white/40">{a.priority}</span>
-                </label>
-                <div className="flex shrink-0 items-center gap-3">
-                  {a.status === "Pending" && (
-                    <span className={days <= 2 ? "text-xs text-red-600" : "text-xs text-black/50 dark:text-white/50"}>
-                      {days < 0 ? "Overdue" : `${days}d`}
-                    </span>
-                  )}
-                  <ConfirmDeleteButton
-                    action={deleteAssignment.bind(null, a.id)}
-                    confirmMessage={`Delete assignment "${a.title}"? This can't be undone.`}
-                    className="text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400"
-                  />
-                </div>
-              </div>
-            );
-          })}
+          {subject.assignments.map((a) => (
+            <AssignmentRow
+              key={a.id}
+              id={a.id}
+              title={a.title}
+              deadlineISO={a.deadline.toISOString().slice(0, 10)}
+              priority={a.priority}
+              estimateMin={a.estimateMin}
+              status={a.status}
+              days={daysUntil(a.deadline)}
+            />
+          ))}
         </div>
       </div>
     </div>

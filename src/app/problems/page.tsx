@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { deleteProblem } from "@/app/actions";
-import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { AddProblemForm } from "./AddProblemForm";
 import { LeetCodeImportForm } from "./LeetCodeImportForm";
+import { ProblemRow } from "./ProblemRow";
 import { prisma } from "@/lib/db";
 
 const FILTERS = ["All", "Solved", "Unsolved", "Attempted", "Mistakes", "Easy", "Medium", "Hard"] as const;
@@ -73,49 +72,19 @@ export default async function ProblemsPage({
         {problems.map((p) => {
           const lastMistake = [...p.attempts].reverse().find((a) => a.mistakeTag)?.mistakeTag;
           return (
-            <div key={p.id} className="flex items-center justify-between gap-3 py-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  {p.url ? (
-                    <a href={p.url} target="_blank" rel="noreferrer" className="truncate font-medium hover:underline">
-                      {p.title}
-                    </a>
-                  ) : (
-                    <span className="truncate font-medium">{p.title}</span>
-                  )}
-                  <StatusBadge status={p.status} />
-                </div>
-                <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-black/50 dark:text-white/50">
-                  <span>{p.pattern}</span>
-                  <span>·</span>
-                  <span>{p.difficulty}</span>
-                  {lastMistake && (
-                    <>
-                      <span>·</span>
-                      <span className="text-amber-600">{lastMistake}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <ConfirmDeleteButton
-                action={deleteProblem.bind(null, p.id)}
-                confirmMessage={`Delete "${p.title}"? This also deletes its attempt history. This can't be undone.`}
-                className="shrink-0 text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400"
-              />
-            </div>
+            <ProblemRow
+              key={p.id}
+              id={p.id}
+              title={p.title}
+              url={p.url}
+              pattern={p.pattern}
+              difficulty={p.difficulty}
+              status={p.status}
+              lastMistake={lastMistake}
+            />
           );
         })}
       </div>
     </div>
   );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const color =
-    status === "Solved"
-      ? "text-green-700 dark:text-green-400"
-      : status === "Attempted"
-        ? "text-amber-600"
-        : "text-black/40 dark:text-white/40";
-  return <span className={`text-[10px] font-medium uppercase tracking-wide ${color}`}>{status}</span>;
 }

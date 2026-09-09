@@ -1,9 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteProject } from "@/app/actions";
 import { getProjectDetail } from "@/lib/db";
-import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { ProjectDetailForm } from "../ProjectDetailForm";
+import { ProjectHeader } from "../ProjectHeader";
 import { ProjectInterviewer } from "../ProjectInterviewer";
 
 export const dynamic = "force-dynamic";
@@ -15,23 +13,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <Link href="/projects" className="text-xs text-black/40 hover:underline dark:text-white/40">
-            ← Projects
-          </Link>
-          <h1 className="text-xl font-semibold">{project.name}</h1>
-          {project.description && <p className="text-sm text-black/60 dark:text-white/60">{project.description}</p>}
-          {project.techStack && <p className="text-xs text-black/40 dark:text-white/40">{project.techStack}</p>}
-        </div>
-        <ConfirmDeleteButton
-          action={deleteProject.bind(null, project.id)}
-          confirmMessage={`Delete "${project.name}"? This also deletes its interview questions. This can't be undone.`}
-          className="shrink-0 text-xs text-black/40 hover:text-red-600 dark:text-white/40 dark:hover:text-red-400"
-        >
-          Delete project
-        </ConfirmDeleteButton>
-      </div>
+      <ProjectHeader id={project.id} name={project.name} description={project.description} techStack={project.techStack} />
 
       <ProjectDetailForm
         projectId={project.id}
