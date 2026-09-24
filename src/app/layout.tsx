@@ -31,6 +31,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
               Dashboard
             </Link>
+            <Link href="/today" className="shrink-0 text-sm font-semibold text-black hover:underline dark:text-white">
+              Today&apos;s DSA
+            </Link>
+            <Link href="/mastery" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
+              Mastery
+            </Link>
             <Link href="/problems" className="shrink-0 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
               Problems
             </Link>

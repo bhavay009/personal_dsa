@@ -8,15 +8,17 @@ datasource db {
 }
 
 model Problem {
-  id         Int       @id @default(autoincrement())
-  title      String
-  url        String?
-  pattern    String
-  difficulty String // Easy | Medium | Hard
-  status     String    @default("Unsolved") // Solved | Unsolved | Attempted
-  notes      String?
-  createdAt  DateTime  @default(now())
-  attempts   Attempt[]
+  id          Int                 @id @default(autoincrement())
+  title       String
+  url         String?
+  pattern     String
+  difficulty  String // Easy | Medium | Hard
+  status      String              @default("Unsolved") // Solved | Unsolved | Attempted
+  notes       String?
+  createdAt   DateTime            @default(now())
+  attempts    Attempt[]
+  predictions PatternPrediction[]
+  hints       HintEvent[]
 
   // SM-2 spaced-repetition state (lives on the card, not the attempt)
   easeFactor   Float @default(2.5)
@@ -146,6 +148,63 @@ model Application {
   createdAt     DateTime  @default(now())
 
   @@index([stage])
+}
+
+// ---------- Coach: adaptive session engine (§6, §7) ----------
+
+model SessionPlan {
+  id      Int            @id @default(autoincrement())
+  date    DateTime       @default(now())
+  goalMin Int
+  status  String         @default("Active") // Active | Completed
+  blocks  SessionBlock[]
+
+  @@index([date])
+}
+
+model SessionBlock {
+  id        Int         @id @default(autoincrement())
+  plan      SessionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planId    Int
+  position  Int
+  kind      String // Recall | Drill | NewProblem | Transfer | Revision | Timed
+  minutes   Int
+  pattern   String?
+  problemId Int?
+  // Plain-English justification tied to real evidence. §10: the score must be
+  // explainable — a block the learner can't interrogate is indistinguishable
+  // from a random suggestion.
+  rationale String
+  status    String      @default("Pending") // Pending | Done | Skipped
+
+  @@index([planId])
+}
+
+// Pattern-recognition training (§11). Prediction is recorded BEFORE the attempt,
+// so recognition can be scored independently of whether the problem was solved.
+model PatternPrediction {
+  id        Int      @id @default(autoincrement())
+  problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  problemId Int
+  predicted String
+  actual    String
+  correct   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([problemId])
+}
+
+// Hint telemetry (§8). secondsBefore is the time spent struggling before asking,
+// which distinguishes "stuck and thinking" from "reflexively reaching for help".
+model HintEvent {
+  id            Int      @id @default(autoincrement())
+  problem       Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  problemId     Int
+  level         Int // 0-8, see lib/hints.ts
+  secondsBefore Int
+  createdAt     DateTime @default(now())
+
+  @@index([problemId])
 }
 
 model Attempt {

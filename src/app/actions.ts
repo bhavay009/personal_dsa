@@ -569,6 +569,69 @@ export async function deleteApplication(id: number) {
   revalidatePath("/applications");
 }
 
+// ---------- Coach: adaptive session (§6, §7) ----------
+
+export async function startTodaySession(goalMin: number) {
+  const { composeSession } = await import("@/lib/session-engine");
+
+  // One active plan at a time — starting a new session closes the old one
+  // rather than silently accumulating half-finished days.
+  await prisma.sessionPlan.updateMany({ where: { status: "Active" }, data: { status: "Completed" } });
+
+  const drafts = await composeSession(goalMin);
+  const plan = await prisma.sessionPlan.create({
+    data: {
+      goalMin,
+      blocks: {
+        create: drafts.map((b, i) => ({
+          position: i,
+          kind: b.kind,
+          minutes: b.minutes,
+          pattern: b.pattern,
+          problemId: b.problemId,
+          rationale: b.rationale,
+        })),
+      },
+    },
+  });
+
+  revalidatePath("/today");
+  revalidatePath("/");
+  return plan.id;
+}
+
+export async function setBlockStatus(blockId: number, status: "Done" | "Skipped" | "Pending") {
+  await prisma.sessionBlock.update({ where: { id: blockId }, data: { status } });
+  revalidatePath("/today");
+  revalidatePath("/");
+}
+
+export async function finishSession(planId: number) {
+  await prisma.sessionPlan.update({ where: { id: planId }, data: { status: "Completed" } });
+  revalidatePath("/today");
+  revalidatePath("/");
+}
+
+// §11: recorded before the attempt, so recognition is scored independently of
+// whether the problem was eventually solved.
+export async function recordPatternPrediction(problemId: number, predicted: string) {
+  const problem = await prisma.problem.findUniqueOrThrow({
+    where: { id: problemId },
+    select: { pattern: true },
+  });
+  await prisma.patternPrediction.create({
+    data: { problemId, predicted, actual: problem.pattern, correct: predicted === problem.pattern },
+  });
+  revalidatePath("/today");
+  revalidatePath("/mastery");
+  return { correct: predicted === problem.pattern, actual: problem.pattern };
+}
+
+export async function recordHint(problemId: number, level: number, secondsBefore: number) {
+  await prisma.hintEvent.create({ data: { problemId, level, secondsBefore } });
+  revalidatePath("/mastery");
+}
+
 // ---------- Resume: JD comparison ----------
 
 export async function compareResumeToJD(jdText: string) {
