@@ -19,11 +19,17 @@ model Problem {
   attempts    Attempt[]
   predictions PatternPrediction[]
   hints       HintEvent[]
+  userNotes   UserNote[]
 
-  // SM-2 spaced-repetition state (lives on the card, not the attempt)
+  // SM-2 spaced-repetition state (lives on the card, not the attempt) — governs WHEN.
   easeFactor   Float @default(2.5)
   intervalDays Float @default(0)
   repetitions  Int   @default(0)
+
+  // Revision hierarchy (§13 of the coach spec) — governs WHAT to revise next.
+  // Separate from SM-2 on purpose: SM-2 decides the date, this decides the task.
+  // 4 = "Original Problem Re-solve", the natural entry point once a problem is due again.
+  revisionLevel Int @default(4)
 }
 
 model Exam {
@@ -157,6 +163,10 @@ model SessionPlan {
   date    DateTime       @default(now())
   goalMin Int
   status  String         @default("Active") // Active | Completed
+  // Daily = the adaptive /today session. OA = a timed multi-problem mock exam.
+  // Blind = a single ad-hoc no-hints/no-pattern attempt. All three reuse the same
+  // SessionPlan/SessionBlock/BlockRunner machinery rather than duplicating it.
+  mode    String         @default("Daily")
   blocks  SessionBlock[]
 
   @@index([date])
@@ -171,6 +181,14 @@ model SessionBlock {
   minutes   Int
   pattern   String?
   problemId Int?
+  // Which of the 7 revision levels this block targets, when kind is a revision-family
+  // block. Null for NewProblem/plain Transfer blocks that aren't part of the hierarchy.
+  revisionLevel Int?
+  // Levels 5/6 (Similar/Transfer) solve a DIFFERENT problem (problemId) than the one
+  // actually due for revision — this holds that original problem's id, so logging the
+  // outcome advances ITS revision level/SM-2 schedule, not just the substitute's own.
+  // Null whenever problemId already IS the thing being revised.
+  revisionTargetId Int?
   // Plain-English justification tied to real evidence. §10: the score must be
   // explainable — a block the learner can't interrogate is indistinguishable
   // from a random suggestion.
@@ -189,6 +207,11 @@ model PatternPrediction {
   predicted String
   actual    String
   correct   Boolean
+  // Self-reported confidence (1-5) and free-text reasoning, both optional. Recorded
+  // for the transfer-challenge "what pattern, and why" step; kept independent of
+  // whether the problem was eventually solved (§5).
+  confidence Int?
+  reasoning  String?
   createdAt DateTime @default(now())
 
   @@index([problemId])
@@ -219,6 +242,99 @@ model Attempt {
   timeTakenMin Int?
   nextRevision DateTime?
 
+  // Which revision level this specific attempt was performed at (§13). Null means
+  // this was a first-time solve attempt, not a scheduled revision.
+  revisionLevel Int?
+  // Self-reported confidence (1-5), optional — feeds the revision decision engine.
+  confidence    Int?
+
   @@index([problemId])
   @@index([nextRevision])
+}
+
+// ---------- Curriculum: the zero-to-hero DSA journey ----------
+//
+// A single fixed curriculum for a single-user app — deliberately NOT a
+// Curriculum/CurriculumStage/UserCurriculumProgress hierarchy. There's one
+// learner and one ordering; a join-table model would be structure for
+// structure's sake. `key` is the same string already used everywhere as
+// Problem.pattern — this table adds ORDERING, TEACHING CONTENT, and PROGRESS
+// STATE on top of the existing pattern vocabulary, not a parallel one.
+//
+// Almost everything about "where am I in the journey" is deliberately NOT
+// stored here — status (LOCKED/CURRENT/DEVELOPING/STRONG/READY) is computed
+// live from Attempt/PatternPrediction data via lib/curriculum.ts, the same
+// evidence-based approach as pattern mastery. Only genuine historical facts
+// are persisted: when a topic was started, when the user moved past it, and
+// whether that move was an override of the coach's own recommendation.
+model CurriculumTopic {
+  id            Int    @id @default(autoincrement())
+  key           String @unique // matches a value in lib/constants.ts PATTERNS
+  name          String
+  stage         String // Foundation | Core Data Structures | Algorithms | Dynamic Programming
+  order         Int    @unique
+
+  // Comma-separated CurriculumTopic.key values — informational/display only,
+  // the curriculum's ordering already encodes sequencing.
+  prerequisites String?
+
+  // Static, curated teaching content (§25) — deterministic, not AI-generated.
+  // List fields are JSON-encoded strings (SQLite has no native array type).
+  overview       String
+  whyItMatters   String
+  coreConcepts   String
+  keyPatterns    String
+  commonMistakes String
+  interviewClues String
+
+  startedAt            DateTime?
+  advancedAt           DateTime?
+  userOverrideAdvanced Boolean   @default(false)
+
+  @@index([stage])
+}
+
+// ---------- Pattern Intelligence + Personal Notes ----------
+//
+// PatternKnowledge is canonical, curated content — deterministic, not AI-generated
+// (no LLM is configured in this app, same principle as everywhere else). `key`
+// reuses the same pattern-string vocabulary as Problem.pattern/CurriculumTopic.key
+// rather than a new taxonomy — a loose string link, not a foreign key, exactly
+// like the existing Problem.pattern <-> CurriculumTopic.key relationship.
+model PatternKnowledge {
+  id    Int    @id @default(autoincrement())
+  key   String @unique // matches Problem.pattern / CurriculumTopic.key
+
+  whatItIs           String
+  signals            String // JSON string[] — structural/keyword clues
+  whenToUse          String // JSON string[]
+  whenNotToUse       String // JSON string[] — teaches discrimination, not keyword matching
+  coreIdea           String
+  invariant          String
+  template           String // concise pseudocode, not a full solution
+  commonTraps        String // JSON string[]
+  relatedPatterns    String // JSON string[] of other PatternKnowledge.key values
+  interviewTakeaway  String
+  commonVariants     String? // JSON string[], only where a pattern genuinely has named variants
+}
+
+// A user's own note. Intentionally generic (not ProblemNote/PatternNote/TopicNote
+// tables) since the shape is identical either way — only which scope field is set
+// differs. `pattern`/`topicKey` are loose string links, same convention as
+// PatternKnowledge.key and CurriculumTopic.key above; `problemId` is a real FK
+// since Problem rows can be deleted and notes should go with them.
+model UserNote {
+  id        Int      @id @default(autoincrement())
+  type      String // takeaway | clue | mistake | template | edge-case | interview | quick
+  content   String
+  problemId Int?
+  problem   Problem? @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  pattern   String?
+  topicKey  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([problemId])
+  @@index([pattern])
+  @@index([topicKey])
 }

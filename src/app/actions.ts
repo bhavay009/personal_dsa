@@ -10,16 +10,12 @@ import {
   outcomeToQuality,
   prisma,
   searchDocuments,
-  type Outcome,
   PATTERNS,
 } from "@/lib/db";
+import { recordAttempt, type AttemptInput } from "@/lib/attempts";
 import { getSmartPlan } from "@/lib/insights";
 
-export type AttemptInput = {
-  outcome: Outcome | null;
-  mistakeTag: string | null;
-  timeTakenMin: number | null;
-};
+export type { AttemptInput };
 
 const DEFAULT_SM2 = { easeFactor: 2.5, intervalDays: 0, repetitions: 0 };
 
@@ -82,40 +78,11 @@ export async function updateProblem(
   revalidatePath("/revise");
 }
 
-export async function logAttempt(problemId: number, input: AttemptInput) {
-  if (!input.outcome) return;
-  const now = new Date();
-
-  const problem = await prisma.problem.findUniqueOrThrow({
-    where: { id: problemId },
-    select: { easeFactor: true, intervalDays: true, repetitions: true },
-  });
-
-  const quality = outcomeToQuality(input.outcome, input.mistakeTag);
-  const sm2 = computeSm2Update(problem, quality, now);
-
-  await Promise.all([
-    prisma.attempt.create({
-      data: {
-        problemId,
-        date: now,
-        outcome: input.outcome,
-        mistakeTag: input.mistakeTag,
-        timeTakenMin: input.timeTakenMin,
-        nextRevision: sm2.nextRevision,
-      },
-    }),
-    prisma.problem.update({
-      where: { id: problemId },
-      data: {
-        status: input.outcome === "Solved" ? "Solved" : "Attempted",
-        easeFactor: sm2.easeFactor,
-        intervalDays: sm2.intervalDays,
-        repetitions: sm2.repetitions,
-      },
-    }),
-  ]);
-
+// The DB-writing logic lives in lib/attempts.ts (recordAttempt) so it can be
+// exercised in tests without a Next.js request context — revalidatePath here is
+// the only thing this wrapper adds.
+export async function logAttempt(problemId: number, input: AttemptInput, revisionTargetId?: number | null) {
+  await recordAttempt(problemId, input, revisionTargetId);
   revalidatePath("/");
   revalidatePath("/problems");
   revalidatePath("/revise");
@@ -571,17 +538,20 @@ export async function deleteApplication(id: number) {
 
 // ---------- Coach: adaptive session (§6, §7) ----------
 
-export async function startTodaySession(goalMin: number) {
-  const { composeSession } = await import("@/lib/session-engine");
+type Mode = "Daily" | "OA" | "Blind";
+type BlockDraft = Awaited<ReturnType<typeof import("@/lib/session-engine").composeSession>>[number];
 
-  // One active plan at a time — starting a new session closes the old one
-  // rather than silently accumulating half-finished days.
+// Shared by all three session kinds (Daily/OA/Blind) — they differ only in how
+// composeSession/composeOaSession/composeBlindSession pick blocks, not in how a
+// plan is stored or run. One active plan system-wide at a time, regardless of
+// mode, so state stays unambiguous.
+async function createSessionPlan(mode: Mode, goalMin: number, drafts: BlockDraft[]) {
   await prisma.sessionPlan.updateMany({ where: { status: "Active" }, data: { status: "Completed" } });
 
-  const drafts = await composeSession(goalMin);
   const plan = await prisma.sessionPlan.create({
     data: {
       goalMin,
+      mode,
       blocks: {
         create: drafts.map((b, i) => ({
           position: i,
@@ -589,6 +559,8 @@ export async function startTodaySession(goalMin: number) {
           minutes: b.minutes,
           pattern: b.pattern,
           problemId: b.problemId,
+          revisionLevel: b.revisionLevel,
+          revisionTargetId: b.revisionTargetId,
           rationale: b.rationale,
         })),
       },
@@ -596,31 +568,72 @@ export async function startTodaySession(goalMin: number) {
   });
 
   revalidatePath("/today");
+  revalidatePath("/oa");
+  revalidatePath("/blind");
   revalidatePath("/");
   return plan.id;
+}
+
+export async function startTodaySession(goalMin: number) {
+  const { composeTodayPlan } = await import("@/lib/curriculum");
+  const drafts = await composeTodayPlan(goalMin);
+  return createSessionPlan("Daily", goalMin, drafts);
+}
+
+export async function startOaSession(minutes: number) {
+  const { composeOaSession } = await import("@/lib/session-engine");
+  const drafts = await composeOaSession(minutes);
+  return createSessionPlan("OA", minutes, drafts);
+}
+
+export async function startBlindSession(problemId?: number | null) {
+  const { composeBlindSession } = await import("@/lib/session-engine");
+  const drafts = await composeBlindSession(problemId ?? null);
+  const goalMin = drafts.reduce((sum, b) => sum + b.minutes, 0) || 30;
+  return createSessionPlan("Blind", goalMin, drafts);
 }
 
 export async function setBlockStatus(blockId: number, status: "Done" | "Skipped" | "Pending") {
   await prisma.sessionBlock.update({ where: { id: blockId }, data: { status } });
   revalidatePath("/today");
+  revalidatePath("/oa");
+  revalidatePath("/blind");
   revalidatePath("/");
 }
 
 export async function finishSession(planId: number) {
   await prisma.sessionPlan.update({ where: { id: planId }, data: { status: "Completed" } });
   revalidatePath("/today");
+  revalidatePath("/oa");
+  revalidatePath("/blind");
   revalidatePath("/");
+}
+
+export async function getSessionReportAction(planId: number) {
+  const { getSessionReport } = await import("@/lib/session-engine");
+  return getSessionReport(planId);
 }
 
 // §11: recorded before the attempt, so recognition is scored independently of
 // whether the problem was eventually solved.
-export async function recordPatternPrediction(problemId: number, predicted: string) {
+export async function recordPatternPrediction(
+  problemId: number,
+  predicted: string,
+  extra?: { confidence: number | null; reasoning: string | null },
+) {
   const problem = await prisma.problem.findUniqueOrThrow({
     where: { id: problemId },
     select: { pattern: true },
   });
   await prisma.patternPrediction.create({
-    data: { problemId, predicted, actual: problem.pattern, correct: predicted === problem.pattern },
+    data: {
+      problemId,
+      predicted,
+      actual: problem.pattern,
+      correct: predicted === problem.pattern,
+      confidence: extra?.confidence ?? null,
+      reasoning: extra?.reasoning ?? null,
+    },
   });
   revalidatePath("/today");
   revalidatePath("/mastery");
@@ -630,6 +643,61 @@ export async function recordPatternPrediction(problemId: number, predicted: stri
 export async function recordHint(problemId: number, level: number, secondsBefore: number) {
   await prisma.hintEvent.create({ data: { problemId, level, secondsBefore } });
   revalidatePath("/mastery");
+}
+
+// ---------- Curriculum: the zero-to-hero journey (§5, §14, §19) ----------
+
+// Viewing the Learn card is itself the start of the topic — recorded as a
+// genuine fact, independent of whether/when a practice session follows.
+export async function beginTopicLearn(topicKey: string) {
+  const { markTopicStarted } = await import("@/lib/curriculum");
+  await markTopicStarted(topicKey);
+  revalidatePath("/");
+  revalidatePath("/roadmap");
+}
+
+// The ONLY way forward progression happens (§5/§19): either the readiness
+// engine says READY, or the user explicitly overrides it. Both paths funnel
+// through here so the override is always recorded, never silent.
+export async function advanceTopicAction(topicKey: string, override: boolean) {
+  const { advanceTopic } = await import("@/lib/curriculum");
+  await advanceTopic(topicKey, override);
+  revalidatePath("/");
+  revalidatePath("/today");
+  revalidatePath("/roadmap");
+  revalidatePath(`/roadmap/${encodeURIComponent(topicKey)}`);
+}
+
+// ---------- Pattern Intelligence + Personal Notes ----------
+
+export async function createNoteAction(
+  scope: { problemId?: number | null; pattern?: string | null; topicKey?: string | null },
+  type: string,
+  content: string,
+) {
+  const { createNote } = await import("@/lib/notes");
+  await createNote(scope, type, content);
+  revalidatePath("/today");
+  revalidatePath("/problems");
+  revalidatePath("/patterns");
+  if (scope.pattern) revalidatePath(`/patterns/${encodeURIComponent(scope.pattern)}`);
+  if (scope.topicKey) revalidatePath(`/roadmap/${encodeURIComponent(scope.topicKey)}`);
+}
+
+export async function updateNoteAction(id: number, content: string, type?: string) {
+  const { updateNote } = await import("@/lib/notes");
+  await updateNote(id, content, type);
+  revalidatePath("/today");
+  revalidatePath("/problems");
+  revalidatePath("/patterns");
+}
+
+export async function deleteNoteAction(id: number) {
+  const { deleteNote } = await import("@/lib/notes");
+  await deleteNote(id);
+  revalidatePath("/today");
+  revalidatePath("/problems");
+  revalidatePath("/patterns");
 }
 
 // ---------- Resume: JD comparison ----------

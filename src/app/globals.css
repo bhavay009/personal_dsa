@@ -1,26 +1,61 @@
 @import "tailwindcss";
 
+/* Dark mode is opt-in via a ".dark" class we never add, instead of following the
+   OS's prefers-color-scheme — the app stays a warm, light cream theme regardless
+   of system settings. This makes every existing "dark:" utility class inert
+   without having to touch the dozens of files that use them. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #faf6ec;
+  --foreground: #211c12;
+
+  /* Surfaces — one step up from the page background, for panels/cards. Restrained
+     on purpose: the hierarchy comes from spacing and type, not shadows. */
+  --surface: #ffffff;
+  --surface-muted: #f2ece0;
+  --border: #e4dcc9;
+  --border-strong: #d6cbae;
+  --muted: #746b57;
+
+  /* Semantic colors — used ONLY for status/priority/success/warning/failure and
+     the one primary call-to-action per screen. Everything else stays neutral. */
+  --success: #2f6f4f;
+  --success-bg: #e7efe4;
+  --warning: #9a5b13;
+  --warning-bg: #f5ead2;
+  --danger: #a13f3f;
+  --danger-bg: #f4e2e0;
+  --accent: #171310;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-muted: var(--muted);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Keyboard users need a visible focus ring; mouse users don't need the noise. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

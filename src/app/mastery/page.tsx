@@ -1,93 +1,147 @@
 import Link from "next/link";
-import { getHintDependency, getPatternMastery, type Signal } from "@/lib/mastery";
+import { getHintDependency, getPatternMastery, getPredictionCrossTab, type MasteryState, type PatternMastery, type Signal } from "@/lib/mastery";
+import { detectPatternConfusion } from "@/lib/pattern-knowledge";
+import { EmptyState, Panel, SectionLabel } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-const STATE_ORDER = [
-  "UNKNOWN",
-  "EXPOSED",
-  "RECOGNIZED",
-  "APPLIED",
-  "RETAINED",
-  "TRANSFERRED",
-  "INTERVIEW_READY",
-];
+const STATE_LABEL: Record<MasteryState, string> = {
+  UNKNOWN: "Not started",
+  EXPOSED: "Seen, not yet recognized reliably",
+  RECOGNIZED: "Recognizes the pattern",
+  APPLIED: "Can apply it",
+  RETAINED: "Retains it over time",
+  TRANSFERRED: "Can transfer to new surfaces",
+  INTERVIEW_READY: "Interview ready",
+};
+
+// What to train next, derived from which dimension is weakest — this is the same
+// idea as the session engine's own routing, just phrased for a human reading the
+// mastery page rather than composing a session block.
+function nextTraining(m: PatternMastery): string {
+  if (m.recognition.label === "weak") return "Pattern recall drills — name it before you solve it.";
+  if (m.implementation.label === "weak") return "Algorithm reconstruction, then a careful re-solve.";
+  if (m.retention.label === "weak") return "Spaced re-solve of problems you've already seen.";
+  if (m.transfer.label === "weak") return "A transfer challenge — same technique, different surface.";
+  if (m.speed.label === "weak") return "A timed blind test to build pace.";
+  return "Keep going — no single weak dimension stands out yet.";
+}
 
 export default async function MasteryPage() {
-  const [report, hintDependency] = await Promise.all([getPatternMastery(), getHintDependency()]);
+  const [report, hintDependency, crossTab, confusions] = await Promise.all([
+    getPatternMastery(),
+    getHintDependency(),
+    getPredictionCrossTab(),
+    detectPatternConfusion(),
+  ]);
+
+  const strong = report.filter((m) => m.priority === "LOW");
+  const developing = report.filter((m) => m.priority === "MEDIUM");
+  const needsAttention = report.filter((m) => m.priority === "HIGH");
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8">
       <div>
-        <h1 className="text-xl font-semibold">Pattern mastery</h1>
-        <p className="mt-1 text-sm text-black/50 dark:text-white/50">
-          Every number here is a training signal with its evidence count attached — not a score. A dimension
-          stays &ldquo;no data&rdquo; until there are at least 3 observations behind it.
+        <h1 className="text-xl font-semibold">What do I actually know?</h1>
+        <p className="mt-1 text-sm text-muted">
+          Every number here is a training signal with its evidence count attached — not a score. A dimension stays
+          &ldquo;insufficient evidence&rdquo; until there are at least 3 observations behind it.
         </p>
       </div>
 
       {hintDependency.sample > 0 && (
-        <div className="rounded-lg border border-black/10 p-4 dark:border-white/15">
+        <Panel>
           <div className="text-2xl font-semibold">{hintDependency.pct}%</div>
-          <div className="text-xs text-black/50 dark:text-white/50">
-            of your last {hintDependency.sample} problems needed a level-5+ hint
+          <div className="text-xs text-muted">
+            of your last {hintDependency.sample} problems needed heavy help
             {hintDependency.pct >= 40 && " — the engine is scheduling no-hint blocks until this drops"}
           </div>
-        </div>
+        </Panel>
+      )}
+
+      {crossTab.insight && (
+        <Panel>
+          <SectionLabel>Pattern recognition</SectionLabel>
+          <p className="mt-1 text-sm">{crossTab.insight}</p>
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted">
+            <span>Predicted right, solved: {crossTab.correctSolved}</span>
+            <span>Predicted right, failed: {crossTab.correctFailed}</span>
+            <span>Predicted wrong, solved: {crossTab.incorrectSolved}</span>
+            <span>Predicted wrong, failed: {crossTab.incorrectFailed}</span>
+          </div>
+        </Panel>
+      )}
+
+      {confusions.length > 0 && (
+        <Panel>
+          <SectionLabel>You often confuse these</SectionLabel>
+          <div className="mt-2 flex flex-col gap-2">
+            {confusions.map((c) => (
+              <div key={`${c.patternA}-${c.patternB}`} className="flex items-center justify-between text-sm">
+                <span>
+                  {c.patternA} vs {c.patternB}
+                </span>
+                <span className="text-xs text-muted">{c.count} mix-ups</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted">Open either pattern&apos;s guide for a side-by-side comparison and a recognition quiz.</p>
+        </Panel>
       )}
 
       {report.length === 0 && (
-        <p className="text-sm text-black/50 dark:text-white/50">
-          No patterns tracked yet. Log some problems and the model starts filling in.
-        </p>
+        <EmptyState
+          title="Not enough data yet"
+          description="Solve a few problems and the model starts filling in. We won't guess at mastery from nothing."
+        />
       )}
 
-      <div className="flex flex-col gap-3">
-        {report.map((m) => (
-          <div key={m.pattern} className="rounded-lg border border-black/10 p-4 dark:border-white/15">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="font-medium">{m.pattern}</div>
-                <div className="text-xs text-black/40 dark:text-white/40">
-                  {m.solvedCount}/{m.problemCount} solved · step {STATE_ORDER.indexOf(m.state) + 1} of{" "}
-                  {STATE_ORDER.length}
-                </div>
-              </div>
-              <div className="shrink-0 text-right">
-                <div className="text-xs font-semibold uppercase tracking-wide">{m.state.replace("_", " ")}</div>
-                <div
-                  className={`text-[10px] font-medium uppercase ${
-                    m.priority === "HIGH"
-                      ? "text-red-600"
-                      : m.priority === "MEDIUM"
-                        ? "text-amber-600"
-                        : "text-black/40 dark:text-white/40"
-                  }`}
-                >
-                  {m.priority} priority
-                </div>
-              </div>
-            </div>
+      <PatternGroup title="Needs attention" patterns={needsAttention} tone="danger" />
+      <PatternGroup title="Developing" patterns={developing} tone="warning" />
+      <PatternGroup title="Strong" patterns={strong} tone="success" />
 
-            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-5">
-              <Dim label="Recognition" s={m.recognition} />
-              <Dim label="Implementation" s={m.implementation} />
-              <Dim label="Speed" s={m.speed} />
-              <Dim label="Retention" s={m.retention} />
-              <Dim label="Transfer" s={m.transfer} />
-            </div>
-
-            <p className="mt-3 text-xs text-black/60 dark:text-white/60">{m.reason}</p>
-          </div>
-        ))}
-      </div>
-
-      <Link
-        href="/today"
-        className="self-start text-xs text-black/40 hover:text-black/70 hover:underline dark:text-white/40 dark:hover:text-white/70"
-      >
+      <Link href="/today" className="self-start text-xs text-muted hover:text-foreground hover:underline">
         ← Back to today&apos;s session
       </Link>
+    </div>
+  );
+}
+
+function PatternGroup({ title, patterns, tone }: { title: string; patterns: PatternMastery[]; tone: "success" | "warning" | "danger" }) {
+  if (patterns.length === 0) return null;
+  const dot = { success: "bg-success", warning: "bg-warning", danger: "bg-danger" }[tone];
+  return (
+    <div>
+      <SectionLabel>{title}</SectionLabel>
+      <div className="mt-2 flex flex-col gap-2">
+        {patterns.map((m) => (
+          <details key={m.pattern} className="group rounded-lg border border-border bg-surface">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3">
+              <span className="flex items-center gap-2">
+                <span className={`h-2 w-2 rounded-full ${dot}`} />
+                <span className="text-sm font-medium">{m.pattern}</span>
+              </span>
+              <span className="text-xs text-muted">{STATE_LABEL[m.state]}</span>
+            </summary>
+            <div className="border-t border-border px-4 py-3">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-5">
+                <Dim label="Recognition" s={m.recognition} />
+                <Dim label="Implementation" s={m.implementation} />
+                <Dim label="Speed" s={m.speed} />
+                <Dim label="Retention" s={m.retention} />
+                <Dim label="Transfer" s={m.transfer} />
+              </div>
+              <p className="mt-3 text-xs text-muted">
+                {m.solvedCount}/{m.problemCount} solved. {m.reason}
+              </p>
+              <div className="mt-3 rounded-md bg-surface-muted p-3">
+                <SectionLabel>Next training</SectionLabel>
+                <p className="mt-1 text-sm">{nextTraining(m)}</p>
+              </div>
+            </div>
+          </details>
+        ))}
+      </div>
     </div>
   );
 }
@@ -95,18 +149,18 @@ export default async function MasteryPage() {
 function Dim({ label, s }: { label: string; s: Signal }) {
   const color =
     s.label === "strong"
-      ? "text-green-700 dark:text-green-400"
-      : s.label === "medium"
-        ? "text-amber-600"
+      ? "text-success"
+      : s.label === "developing"
+        ? "text-warning"
         : s.label === "weak"
-          ? "text-red-600"
-          : "text-black/30 dark:text-white/30";
+          ? "text-danger"
+          : "text-muted";
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wide text-black/40 dark:text-white/40">{label}</div>
+      <div className="text-[10px] uppercase tracking-wide text-muted">{label}</div>
       <div className={`text-sm font-medium ${color}`}>
-        {s.pct === null ? "no data" : `${s.pct}%`}
-        <span className="ml-1 text-[10px] font-normal text-black/30 dark:text-white/30">n={s.evidence}</span>
+        {s.pct === null ? "insufficient evidence" : `${s.pct}%`}
+        <span className="ml-1 text-[10px] font-normal text-muted">n={s.evidence}</span>
       </div>
     </div>
   );

@@ -1,136 +1,100 @@
 import Link from "next/link";
-import { daysUntil, getDashboardStats, getUpcomingAssignments, MISTAKE_TAGS } from "@/lib/db";
-import { getCareerReadiness, getWhatAmIMissing } from "@/lib/insights";
-import { getWeakestPattern } from "@/lib/mastery";
+import { daysUntil, getUpcomingAssignments } from "@/lib/db";
+import { getCurrentTopic, getCurriculumOverview, getJourneyDay, getTopicReadiness } from "@/lib/curriculum";
+import { prisma } from "@/lib/db";
+import { Panel, SectionLabel, StatusBadge } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
+// §29/§30: the home page is about TODAY — Day N, the current topic, why it's
+// the focus, and a short journey list. Solved/streak/career-readiness/export
+// used to live here; they're real, but they're not the product, so they've
+// moved to /mastery, /insights and NavBar's "More" menu instead of competing
+// with the journey for the first thing a user sees.
+
 export default async function DashboardPage() {
-  const [stats, readiness, gaps, assignments, weakest] = await Promise.all([
-    getDashboardStats(),
-    getCareerReadiness(),
-    getWhatAmIMissing(),
+  const [journeyDay, currentTopic, overview, activePlan, assignments] = await Promise.all([
+    getJourneyDay(),
+    getCurrentTopic(),
+    getCurriculumOverview(),
+    prisma.sessionPlan.findFirst({ where: { status: "Active", mode: "Daily" }, include: { blocks: true } }),
     getUpcomingAssignments(),
-    getWeakestPattern(),
   ]);
-  const weakestLabel = stats.weakestTag
-    ? MISTAKE_TAGS.find((t) => t.value === stats.weakestTag!.tag)?.label ?? stats.weakestTag.tag
-    : null;
-  const examDays = stats.soonestExam ? daysUntil(stats.soonestExam.date) : null;
+
+  const readiness = currentTopic ? await getTopicReadiness(currentTopic.key) : null;
   const nearestAssignment = assignments[0] ?? null;
   const assignmentDays = nearestAssignment ? daysUntil(nearestAssignment.deadline) : null;
 
+  const firstUnmastered = overview.findIndex((t) => t.status !== "MASTERED");
+  const journeyWindow = overview.slice(Math.max(0, firstUnmastered - 1), Math.max(0, firstUnmastered - 1) + 4);
+
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8">
-      {/* §6: the homepage revolves around START TODAY'S DSA — everything else here is secondary. */}
-      <div className="flex flex-col gap-3 rounded-lg border border-black/15 p-5 dark:border-white/20">
-        <div>
-          <h1 className="text-xl font-semibold">Today&apos;s DSA</h1>
-          <p className="mt-1 text-sm text-black/50 dark:text-white/50">
-            {stats.revisionDueCount > 0
-              ? `${stats.revisionDueCount} problem${stats.revisionDueCount === 1 ? "" : "s"} overdue for revision`
-              : "Nothing overdue"}
-            {weakest && weakest.priority === "HIGH" && ` · ${weakest.pattern} is the weakest tracked pattern`}
-            {!weakest && " · no patterns tracked yet"}
-            {" — the session engine composes today's hour from this, not a random pick."}
-          </p>
-        </div>
-        <Link
-          href="/today"
-          className="self-start rounded bg-black px-5 py-2.5 text-sm font-semibold text-white dark:bg-white dark:text-black"
-        >
-          START TODAY&apos;S DSA
-        </Link>
-      </div>
-
       <div>
-        <h2 className="text-sm font-semibold text-black/60 dark:text-white/60">Quick actions</h2>
-        <p className="mt-1 text-sm text-black/50 dark:text-white/50">
-          {weakestLabel && `Your weakest spot lately: ${weakestLabel} (${stats.weakestTag!.pct}% of recent mistakes).`}
-        </p>
-      </div>
-
-      <div className="flex gap-3">
-        <Link
-          href="/revise"
-          className="rounded border border-black/20 px-4 py-2 text-sm font-medium dark:border-white/25"
-        >
-          Revise Today {stats.revisionDueCount > 0 && `(${stats.revisionDueCount})`}
-        </Link>
-        <Link
-          href="/problems"
-          className="rounded border border-black/20 px-4 py-2 text-sm font-medium dark:border-white/25"
-        >
-          Log a problem
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat label="Solved" value={stats.totalSolved} />
-        <Stat label="This week" value={stats.solvedThisWeek} />
-        <Stat label="Revise today" value={stats.revisionDueCount} />
-        <Stat label="Streak" value={`${stats.streak}d`} />
+        <p className="text-sm text-muted">DAY {journeyDay} OF YOUR DSA JOURNEY</p>
+        <h1 className="mt-1 text-2xl font-semibold">{currentTopic ? currentTopic.name : "Curriculum complete"}</h1>
+        {readiness && <p className="mt-1 text-sm text-foreground/80">{readiness.recommendation}</p>}
       </div>
 
       <Link
-        href="/insights"
-        className="flex items-center justify-between rounded-lg border border-black/10 p-4 hover:border-black/25 dark:border-white/15 dark:hover:border-white/30"
+        href="/today"
+        className="flex flex-col items-center gap-1 rounded-lg bg-accent px-6 py-8 text-center text-background transition-opacity hover:opacity-90"
       >
-        <span className="text-sm font-medium">Career readiness</span>
-        <span className="text-sm font-semibold">{readiness.overall}%</span>
+        <span className="text-lg font-semibold">
+          {activePlan ? "CONTINUE TODAY'S TRAINING" : !currentTopic?.startedAt ? `START DAY ${journeyDay}` : "START TODAY'S TRAINING"}
+        </span>
+        <span className="text-sm opacity-70">
+          {currentTopic ? `Learn → Practice → Analyze → Improve on ${currentTopic.name}` : "Review anything, any time"}
+        </span>
       </Link>
 
-      {stats.soonestExam && examDays !== null && (
-        <Link
-          href="/exams"
-          className="flex items-center justify-between rounded-lg border border-black/10 p-4 hover:border-black/25 dark:border-white/15 dark:hover:border-white/30"
-        >
-          <span className="text-sm font-medium">{stats.soonestExam.name}</span>
-          <span className={`text-sm font-semibold ${examDays <= 3 ? "text-red-600" : examDays <= 10 ? "text-amber-600" : ""}`}>
-            {examDays === 0 ? "Today" : `${examDays}d`}
-          </span>
-        </Link>
+      {currentTopic && (
+        <div>
+          <SectionLabel>Today&apos;s focus</SectionLabel>
+          <Panel className="mt-2 flex flex-col gap-1">
+            <p className="text-sm font-medium">{currentTopic.name}</p>
+            <p className="text-sm text-muted">
+              <span className="font-semibold text-foreground/70">Why: </span>
+              {currentTopic.whyItMatters}
+            </p>
+          </Panel>
+        </div>
+      )}
+
+      {journeyWindow.length > 0 && (
+        <div>
+          <SectionLabel>Your journey</SectionLabel>
+          <div className="mt-2 flex flex-col gap-1.5">
+            {journeyWindow.map((t) => (
+              <div key={t.key} className="flex items-center justify-between text-sm">
+                <span className={t.key === currentTopic?.key ? "font-semibold" : "text-foreground/70"}>{t.name}</span>
+                <StatusBadge
+                  tone={t.status === "MASTERED" ? "success" : t.status === "READY" || t.status === "STRONG" ? "accent" : "neutral"}
+                >
+                  {/* "Mastered" implies the readiness gate was actually satisfied — a
+                      manually-advanced topic says "Advanced" instead (§ terminology
+                      refinement), consistent with /roadmap. */}
+                  {t.status === "MASTERED" && t.overrideAdvanced ? "Advanced" : t.status}
+                </StatusBadge>
+              </div>
+            ))}
+          </div>
+          <Link href="/roadmap" className="mt-2 inline-block text-xs text-muted hover:text-foreground hover:underline">
+            See the full roadmap →
+          </Link>
+        </div>
       )}
 
       {nearestAssignment && assignmentDays !== null && (
-        <Link
-          href="/college"
-          className="flex items-center justify-between rounded-lg border border-black/10 p-4 hover:border-black/25 dark:border-white/15 dark:hover:border-white/30"
-        >
+        <Link href="/college" className="flex items-center justify-between rounded-lg border border-border p-4 hover:border-border-strong">
           <span className="text-sm font-medium">
-            {nearestAssignment.title} <span className="text-black/40 dark:text-white/40">— {nearestAssignment.subject.name}</span>
+            {nearestAssignment.title} <span className="text-muted">— {nearestAssignment.subject.name}</span>
           </span>
-          <span className={`text-sm font-semibold ${assignmentDays <= 2 ? "text-red-600" : assignmentDays <= 7 ? "text-amber-600" : ""}`}>
+          <span className={`text-sm font-semibold ${assignmentDays <= 2 ? "text-danger" : assignmentDays <= 7 ? "text-warning" : ""}`}>
             {assignmentDays < 0 ? "Overdue" : assignmentDays === 0 ? "Today" : `${assignmentDays}d`}
           </span>
         </Link>
       )}
-
-      {gaps.length > 0 && (
-        <Link
-          href="/insights"
-          className="self-start text-xs text-black/40 hover:text-black/70 hover:underline dark:text-white/40 dark:hover:text-white/70"
-        >
-          Biggest gap: {gaps[0]}
-        </Link>
-      )}
-
-      <a
-        href="/api/export"
-        download
-        className="self-start text-xs text-black/40 hover:text-black/70 hover:underline dark:text-white/40 dark:hover:text-white/70"
-      >
-        Export data (JSON backup)
-      </a>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-lg border border-black/10 p-4 dark:border-white/15">
-      <div className="text-2xl font-semibold">{value}</div>
-      <div className="text-xs text-black/50 dark:text-white/50">{label}</div>
     </div>
   );
 }

@@ -46,6 +46,10 @@ next-env.d.ts
 # (see Part 9 of the product plan: `cp dev.db` to a synced folder after sessions)
 /dev.db
 /dev.db-journal
+# a stray empty prisma/dev.db can appear if a prisma command ever runs without
+# DATABASE_URL set — it's never the real data (that's always /dev.db above),
+# but ignore it so it can't be accidentally committed.
+/prisma/dev.db
 
 # uploaded PDFs — also your data, not source; back this folder up alongside dev.db
 /storage
